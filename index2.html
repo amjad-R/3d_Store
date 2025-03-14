@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تجربة التيشرت الافتراضي</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <style>
+        body {
+            text-align: center;
+            background: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #clothing {
+            position: absolute;
+            width: 200px; /* حجم التيشرت الافتراضي */
+            z-index: 10;
+            border: 2px solid red; /* لإظهار حدود التيشرت */
+            display: none; /* يتم إظهاره عند تحديد الكتفين */
+        }
+        .shoulder-point {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            z-index: 20;
+            display: none; /* يتم إظهاره عند النقر */
+        }
+    </style>
+</head>
+<body>
+    <h1>تجربة التيشرت الافتراضي</h1>
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <img id="clothing" src="T-shirt.png" alt="تيشرت">
+        <div id="left-shoulder" class="shoulder-point"></div>
+        <div id="right-shoulder" class="shoulder-point"></div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const clothing = document.getElementById('clothing');
+        const leftShoulderPoint = document.getElementById('left-shoulder');
+        const rightShoulderPoint = document.getElementById('right-shoulder');
+
+        let leftShoulder = { x: 0, y: 0 }; // إحداثيات الكتف الأيسر
+        let rightShoulder = { x: 0, y: 0 }; // إحداثيات الكتف الأيمن
+        let isLeftShoulderSet = false; // هل تم تحديد الكتف الأيسر؟
+        let isRightShoulderSet = false; // هل تم تحديد الكتف الأيمن؟
+
+        // إزاحة النقاط المحددة يدويًا عن نقاط MediaPipe
+        let offsetLeftShoulder = { x: 0, y: 0 };
+        let offsetRightShoulder = { x: 0, y: 0 };
+
+        // تهيئة MediaPipe Pose
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        });
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            smoothSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+        });
+
+        pose.onResults((results) => {
+            if (results.poseLandmarks && isLeftShoulderSet && isRightShoulderSet) {
+                const mpLeftShoulder = results.poseLandmarks[11]; // الكتف الأيسر من MediaPipe
+                const mpRightShoulder = results.poseLandmarks[12]; // الكتف الأيمن من MediaPipe
+
+                if (mpLeftShoulder && mpRightShoulder) {
+                    // تحويل الإحداثيات النسبية إلى إحداثيات الشاشة
+                    const mpLeftX = mpLeftShoulder.x * video.videoWidth;
+                    const mpLeftY = mpLeftShoulder.y * video.videoHeight;
+                    const mpRightX = mpRightShoulder.x * video.videoWidth;
+                    const mpRightY = mpRightShoulder.y * video.videoHeight;
+
+                    // تطبيق الإزاحة على النقاط المحددة يدويًا
+                    leftShoulder.x = mpLeftX + offsetLeftShoulder.x;
+                    leftShoulder.y = mpLeftY + offsetLeftShoulder.y;
+                    rightShoulder.x = mpRightX + offsetRightShoulder.x;
+                    rightShoulder.y = mpRightY + offsetRightShoulder.y;
+
+                    // تحديث موقع التيشرت
+                    updateClothingPosition();
+                }
+            }
+        });
+
+        // دالة لتحديد موقع الكتفين بالنقر
+        function setShoulderPosition(event) {
+            const rect = video.getBoundingClientRect();
+            const x = event.clientX - rect.left; // إحداثي X بالنسبة للفيديو
+            const y = event.clientY - rect.top; // إحداثي Y بالنسبة للفيديو
+
+            if (!isLeftShoulderSet) {
+                leftShoulder = { x, y };
+                leftShoulderPoint.style.left = `${x}px`;
+                leftShoulderPoint.style.top = `${y}px`;
+                leftShoulderPoint.style.display = "block";
+                isLeftShoulderSet = true;
+                console.log("تم تحديد الكتف الأيسر:", leftShoulder);
+            } else if (!isRightShoulderSet) {
+                rightShoulder = { x, y };
+                rightShoulderPoint.style.left = `${x}px`;
+                rightShoulderPoint.style.top = `${y}px`;
+                rightShoulderPoint.style.display = "block";
+                isRightShoulderSet = true;
+                console.log("تم تحديد الكتف الأيمن:", rightShoulder);
+
+                // حساب الإزاحة بين النقاط المحددة يدويًا ونقاط MediaPipe
+                const mpLeftShoulder = results.poseLandmarks[11]; // الكتف الأيسر من MediaPipe
+                const mpRightShoulder = results.poseLandmarks[12]; // الكتف الأيمن من MediaPipe
+
+                if (mpLeftShoulder && mpRightShoulder) {
+                    offsetLeftShoulder = {
+                        x: leftShoulder.x - mpLeftShoulder.x * video.videoWidth,
+                        y: leftShoulder.y - mpLeftShoulder.y * video.videoHeight,
+                    };
+                    offsetRightShoulder = {
+                        x: rightShoulder.x - mpRightShoulder.x * video.videoWidth,
+                        y: rightShoulder.y - mpRightShoulder.y * video.videoHeight,
+                    };
+                }
+            }
+        }
+
+        // دالة لتحديث موقع التيشرت
+        function updateClothingPosition() {
+            const x = (leftShoulder.x + rightShoulder.x) / 2;
+            const y = (leftShoulder.y + rightShoulder.y) / 2;
+            const width = Math.abs(leftShoulder.x - rightShoulder.x) * 1.8;
+
+            clothing.style.left = `${x - width / 2}px`;
+            clothing.style.top = `${y - width / 2}px`;
+            clothing.style.width = `${width}px`;
+            clothing.style.display = "block"; // إظهار التيشرت
+        }
+
+        // إعداد الكاميرا
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        console.log("الكاميرا تعمل بنجاح");
+                        resolve(video);
+                    };
+                });
+            } catch (error) {
+                console.error("حدث خطأ في الوصول إلى الكاميرا:", error);
+                throw error;
+            }
+        }
+
+        // بدء التشغيل
+        async function start() {
+            try {
+                await setupCamera();
+                video.play();
+
+                // إضافة حدث النقر لتحديد الكتفين
+                video.addEventListener('click', setShoulderPosition);
+
+                const camera = new Camera(video, {
+                    onFrame: async () => {
+                        await pose.send({ image: video });
+                    },
+                    width: 640,
+                    height: 480,
+                });
+                camera.start();
+            } catch (error) {
+                console.error("حدث خطأ أثناء التشغيل:", error);
+            }
+        }
+
+        start();
+    </script>
+</body>
+</html>
