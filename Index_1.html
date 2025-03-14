@@ -79,9 +79,8 @@
                     const y = (leftShoulder.y + rightShoulder.y) / 2 * video.videoHeight;
                     const width = Math.abs(leftShoulder.x - rightShoulder.x) * video.videoWidth * 1.8;
 
-                    // تعديل يدوي لموقع التيشرت
-                    const offsetX = 0; // قم بتعديل هذه القيمة لضبط الموقع الأفقي
-                    const offsetY = 0; // قم بتعديل هذه القيمة لضبط الموقع الرأسي
+                    // ضبط الإحداثيات بناءً على اتجاه الشاشة
+                    const { offsetX, offsetY } = adjustForOrientation(x, y);
 
                     // تحديث موقع التيشرت بناءً على الكتفين
                     clothing.style.left = `${x - width / 2 + offsetX}px`;
@@ -95,6 +94,25 @@
                 clothing.style.display = "none"; // إخفاء التيشرت إذا لم يتم العثور على أي نقاط
             }
         });
+
+        // دالة لضبط الإحداثيات بناءً على اتجاه الشاشة
+        function adjustForOrientation(x, y) {
+            const orientation = window.screen.orientation.type;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (orientation.includes("portrait")) {
+                // في الوضع العمودي، نضبط الإحداثيات
+                offsetX = -50; // تعديل يدوي لموقع التيشرت
+                offsetY = -100; // تعديل يدوي لموقع التيشرت
+            } else if (orientation.includes("landscape")) {
+                // في الوضع الأفقي، نضبط الإحداثيات
+                offsetX = 0;
+                offsetY = 0;
+            }
+
+            return { offsetX, offsetY };
+        }
 
         // إعداد الكاميرا
         async function setupCamera() {
